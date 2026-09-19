@@ -1,0 +1,157 @@
+# ==========================================================================
+# sync.properties — annotated example
+#
+# Generate the real file from the installation directory:
+#     java -jar sync.jar -GenerateProperties
+#
+# Once generated, upgrades will not overwrite it. That is what you want,
+# and it is also why a setting added years ago may still be in effect
+# after three major upgrades. Read the whole file when you inherit a
+# deployment.
+#
+# Restart Sync after any change. Nothing here is hot-reloaded.
+#
+# See docs/04-sync-properties-reference.md
+# ==========================================================================
+
+
+# --------------------------------------------------------------------------
+# NETWORKING
+# --------------------------------------------------------------------------
+
+cdata.http.port=8181
+
+# UI session timeout in seconds. Default 600 (10 minutes), which logs people
+# out mid-configuration often enough to be a real annoyance. 1200 is saner
+# for an internal tool.
+cdata.session.timeout=1200
+
+
+# --------------------------------------------------------------------------
+# TLS
+# --------------------------------------------------------------------------
+# Configure this if the UI is reachable from anything but localhost.
+#
+# The certificate file MUST be readable by the Sync service account
+# (cdatasync:cdatasync by default on Linux). A certificate the service
+# cannot read produces a startup failure whose message does not mention
+# permissions.
+
+# Setting the HTTP port to empty disables plaintext
+#cdata.http.port=
+
+#cdata.tls.port=8443
+#cdata.tls.keyStoreType=PKCS12
+#cdata.tls.keyStorePath=${cdata.home}/mycertificate.pfx
+#cdata.tls.keyStorePassword=ChangeMe
+
+# keyStoreType accepts: jks, pkcs12, jceks
+# ${cdata.home} resolves to the installation directory
+
+
+# --------------------------------------------------------------------------
+# APPLICATION DIRECTORY
+# --------------------------------------------------------------------------
+# Where configuration and data live. Preserved across upgrades.
+#
+# On Linux this defaults to the SAME path as the installation directory.
+# Separate them. It is the highest-value change on a new Linux install and
+# it is the prerequisite for clustering.
+#
+# If Sync will not start after changing this, check ownership first:
+#     sudo chown -R cdatasync:cdatasync /var/lib/cdata-sync
+
+#cdata.app.directory=/var/lib/cdata-sync
+
+# For clustering, point every node at shared storage. The filesystem must
+# genuinely support concurrent access with working file locking — NFS with
+# the wrong mount options produces intermittent failures that look like
+# Sync bugs.
+#cdata.app.directory=/mnt/shared/sync
+
+
+# --------------------------------------------------------------------------
+# APPLICATION DATABASE
+# --------------------------------------------------------------------------
+# Holds jobs, tasks, connections, run history, application log, audit log.
+# NOT your replicated data.
+#
+# Defaults to an embedded file database in the application directory.
+# Move it to a real RDBMS for production:
+#   1. Clustering requires it — nodes coordinate through this database
+#   2. Raised log verbosity makes the embedded engine a bottleneck
+#   3. Your team already backs up the RDBMS
+#
+# Sync 26.2+ has a guided migration wizard in the settings UI. Prefer it
+# over hand-editing. This property is still what you use for scripted or
+# containerised deployments.
+#
+# Give it its own schema or database, not a shared one.
+
+#cdata.app.db=jdbc:cdata:sql:server=dbhost;database=syncmeta;user=syncsvc;password=...
+#cdata.app.db=jdbc:cdata:postgresql:server=dbhost;port=5432;database=syncmeta;user=syncsvc;password=...
+#cdata.app.db=jdbc:cdata:mysql:server=dbhost;port=3306;database=syncmeta;user=syncsvc;password=...
+
+# Avoid plaintext credentials. Encrypt the string:
+#     java -jar sync.jar -EncryptConnectionString "jdbc:cdata:mysql:Server=...;Password=..."
+# then put the output here instead.
+
+
+# --------------------------------------------------------------------------
+# LDAP AUTHENTICATION
+# --------------------------------------------------------------------------
+# A matching user must also exist in Sync. LDAP handles the password, not
+# the account's existence or its role.
+#
+# Set debug=true while getting the DNs right, then turn it OFF. It is
+# verbose and it logs directory structure.
+
+#cdata.loginService.ldap.enabled=true
+#cdata.loginService.ldap.hostname=ldap.example.com
+#cdata.loginService.ldap.port=389
+#cdata.loginService.ldap.authenticationMethod=simple
+#cdata.loginService.ldap.bindDn=CN=SyncBind,CN=Users,DC=example,DC=com
+#cdata.loginService.ldap.bindPassword=...
+#cdata.loginService.ldap.useLdaps=false
+#cdata.loginService.ldap.forceBindingLogin=true
+#cdata.loginService.ldap.debug=false
+
+# User entries
+#cdata.loginService.ldap.userBaseDn=DC=example,DC=com
+#cdata.loginService.ldap.userObjectClass=organizationalPerson
+#cdata.loginService.ldap.userRdnAttribute=cn
+#cdata.loginService.ldap.userIdAttribute=sAMAccountName
+#cdata.loginService.ldap.userPasswordAttribute=userPassword
+
+# Role entries
+#cdata.loginService.ldap.roleBaseDn=DC=example,DC=com
+#cdata.loginService.ldap.roleObjectClass=group
+#cdata.loginService.ldap.roleNameAttribute=cn
+#cdata.loginService.ldap.roleMemberAttribute=member
+
+
+# --------------------------------------------------------------------------
+# LOGIN LOCKOUT
+# --------------------------------------------------------------------------
+# Defaults: 6 failures within 5 minutes triggers a 30 minute lockout.
+#
+#   LockoutFailedAttempts  — failures that trigger lockout; 0 disables
+#   LockoutMinutes         — lockout duration
+#   LockoutTimeCheckPeriod — window in minutes over which failures count
+#
+# Setting LockoutFailedAttempts:0 disables brute-force protection. There is
+# a legitimate reason — an automation repeatedly locking out a shared
+# service login — but fix the automation instead if you can.
+
+#cdata.initParameters=LockoutFailedAttempts:6,LockoutMinutes:30,LockoutTimeCheckPeriod:5
+
+
+# --------------------------------------------------------------------------
+# RECOVERY
+# --------------------------------------------------------------------------
+# When nobody can log in. Run as the service account, or as a user that can
+# write to the application directory. Running as root and leaving root-owned
+# files behind creates a permissions problem.
+#
+#     java -jar sync.jar -ResetPassword -User admin -Password NewPassword \
+#          -AppDirectory /var/lib/cdata-sync

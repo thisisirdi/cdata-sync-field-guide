@@ -1,0 +1,15 @@
+.DS_Store
+Thumbs.db
+*.swp
+*~
+.idea/
+.vscode/
+
+# Never commit real configuration
+sync.properties
+sync.exe.config
+*.pfx
+*.jks
+*.p12
+*.pem
+*.key

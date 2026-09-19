@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ==========================================================================
+  sync.exe.config — annotated example
+
+  Location: {installDirectory}\sync.exe.config  (Windows)
+
+  On Linux and in containers, pass the same options through the service
+  definition or a JAVA_OPTS environment variable instead of this file.
+
+  Rules:
+    - Back this file up before editing
+    - Restart the Sync service; nothing takes effect until you do
+    - Re-check after every upgrade, especially major versions
+
+  See docs/05-jvm-tuning-and-sizing.md
+  ==========================================================================
+-->
+<configuration>
+  <appSettings>
+
+    <!--
+      A starting point for a mixed production workload on a 16 GB / 8 vCPU box.
+      Adjust from measurement, not from hope.
+
+        -Xms2g                     Initial heap. Set close to -Xmx; growing the
+                                   heap under load costs pauses at the worst moment.
+
+        -Xmx10g                    Maximum heap. The number that matters.
+                                   NEVER set this to total machine RAM — the JVM
+                                   needs memory outside the heap and so does the OS.
+                                   Roughly two thirds of physical RAM is a ceiling.
+
+        -XX:+UseG1GC               G1 collector. Use above ~4 GB heap; better pause
+                                   behaviour than the default on large heaps.
+
+        -XX:MaxGCPauseMillis=200   Pause target, not a guarantee. 200ms is sensible.
+
+        -XX:ParallelGCThreads=4    Roughly half your vCPU count. Unset is often fine.
+
+        -Dfile.encoding=UTF-8      SET THIS. Prevents an entire class of character
+                                   corruption when source and host locales disagree —
+                                   the kind that appears only in some rows, usually
+                                   names and addresses, and gets reported weeks later.
+    -->
+    <add key="JAVA_OPTS"
+         value="-Xms2g -Xmx10g -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:ParallelGCThreads=4 -Dfile.encoding=UTF-8" />
+
+    <!--
+      Conservative starting point if you are unsure:
+      value="-Xms1g -Xmx4g -XX:+UseG1GC -Dfile.encoding=UTF-8"
+
+      High volume with wide tables and CDC, on a 32 GB box:
+      value="-Xms20g -Xmx20g -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:ParallelGCThreads=8 -Dfile.encoding=UTF-8"
+    -->
+
+    <!--
+      SIZING STARTING POINTS  (replace with your own measurements)
+
+        Workload                          vCPU   RAM     -Xmx      Concurrent jobs
+        --------------------------------  -----  ------  --------  ---------------
+        Evaluation, small jobs              2     4 GB    2 GB          1-2
+        Small production, narrow tables     4     8 GB    4-6 GB        2-4
+        Mixed production, some wide         8    16 GB   10-12 GB       4-6
+        High volume, wide tables, CDC      16    32 GB   20-24 GB       6-8
+
+      Heap need scales with BATCH SIZE x ROW WIDTH, not row count. A
+      100k-row table with 700 columns costs far more than a 1M-row table
+      with 6 narrow ones.
+
+      Before adding hardware, try:
+        1. Lowering batch size on the offending task (fixes it most often)
+        2. Splitting large jobs so the problem table runs alone
+        3. Parallel partitioned reads, on 26.2+ for supported databases
+        4. Moving the application database off the embedded engine
+    -->
+
+    <!--
+      Bigger heap is NOT always better. A 32 GB heap collects garbage in
+      longer pauses than a 12 GB heap. If Sync is periodically unresponsive
+      rather than failing, an oversized heap is a likely cause.
+      Raise heap to fix out-of-memory errors; do not raise it speculatively.
+    -->
+
+    <!--
+      In Kubernetes, keep container memory limits and -Xmx consistent, or
+      the container gets killed before the JVM ever reports a problem.
+    -->
+
+  </appSettings>
+</configuration>

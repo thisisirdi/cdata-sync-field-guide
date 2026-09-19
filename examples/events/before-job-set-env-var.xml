@@ -1,0 +1,88 @@
+<!--
+  ==========================================================================
+  Before-job event: look up a value at runtime and expose it to task queries.
+
+  The useful pattern. Instead of hardcoding a date cutoff in a task query,
+  look it up from a control or audit table and reference it as a variable.
+
+  Configure on: Job > Events tab > Before Run
+
+  REQUIREMENT: the JDBC driver jar must be present in
+      {appDirectory}/libs/
+  e.g. cdata.jdbc.sql.<version>.jar
+  A missing driver fails in a way that does not obviously say
+  "missing driver". Check this first when a working script stops working
+  after an upgrade or a move to a new host.
+
+  On Sync 26.2+, prefer Python for anything beyond a single lookup — it is
+  testable outside Sync, which this is not.
+
+  See docs/10-events-and-environment-variables.md
+  ==========================================================================
+-->
+
+<api:info title="Before Run" desc="Resolve the incremental cutoff before the job starts">
+  <input name="JobName"     required="true" />
+  <input name="Source"      required="true" />
+  <input name="Destination" required="true" />
+  <input name="JobStatus"   required="true" />
+  <output name="env:*" />
+  <output name="CancelJob" />
+</api:info>
+
+<!--
+  Connection to the lookup database.
+
+  Use a dedicated, minimally privileged account. Read-only on one table is
+  usually enough. Anyone who can read this job can read these credentials.
+-->
+<api:set attr="db.driver" value="cdata.jdbc.sql.SQLDriver" />
+<api:set attr="db.conn"   value="jdbc:cdata:sql:Server=dbhost;Database=AuditDb;User=sync_lookup;Password=..." />
+<api:set attr="db.query"  value="SELECT MAX(LastLoadedAt) AS LastRunTime FROM load_audit WHERE pipeline = 'orders';" />
+
+<api:call op="dbQuery" in="db" out="result">
+
+  <!-- Expose the value to task queries as {env:LastRunTime} -->
+  <api:set attr="out.env:LastRunTime" value="[result.LastRunTime]" />
+
+  <!--
+    Log while developing. These land in the Sync APPLICATION logs, not the
+    job logs — a detail that costs people a lot of time when debugging events.
+  -->
+  <api:set attr="_log.info" value="[JobName] resolved LastRunTime to: [result.LastRunTime]" />
+
+</api:call>
+
+<!--
+  HANDLE THE EMPTY RESULT.
+
+  On the very first run the audit table is empty and the lookup returns
+  null. The task query then filters on an empty string and either fails or,
+  worse, returns nothing and reports success.
+
+  Decide what should happen and write it explicitly — either a sensible
+  default, or cancel the job:
+
+  <api:set attr="out.CancelJob" value="true" />
+
+  Run a full load once before enabling the dynamic filter, otherwise the
+  first incremental run has no baseline.
+-->
+
+<!--
+  ==========================================================================
+  Then reference the variable in the task query:
+
+      REPLICATE [Orders]
+      (
+          OrderId    INT,
+          CustomerId INT,
+          OrderTotal DECIMAL(18,2),
+          ModifiedAt DATETIME,
+          PRIMARY KEY (OrderId)
+      )
+      SELECT OrderId, CustomerId, OrderTotal, ModifiedAt
+      FROM Orders
+      WHERE ModifiedAt >= '{env:LastRunTime}'
+  ==========================================================================
+-->
