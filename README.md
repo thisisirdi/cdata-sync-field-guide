@@ -4,7 +4,7 @@ Practitioner notes on running CData Sync in production: configuration, replicati
 
 Written by [Irdi Duka](https://www.linkedin.com/in/irdi-duka-242128141). I spent four years at CData Software as a Technical Support Engineer, Solutions Engineer and Technical Customer Success Manager, onboarding enterprise customers onto Sync. This is what I learned doing that, rewritten from scratch as an independent reference.
 
-**This is an unofficial guide.** It is not produced, reviewed or endorsed by CData Software. For product documentation, see the [official Sync docs](https://cdn.cdata.com/help/ASM/sync/). Where this guide and the official docs disagree, the official docs are authoritative on *what the product does*; this guide is about *what to do with it*.
+**This is an unofficial guide.** It is not produced, reviewed or endorsed by CData Software. For product documentation, see the [official Sync docs](https://cdn.cdata.com/help/ASN/sync/). Where this guide and the official docs disagree, the official docs are authoritative on *what the product does*; this guide is about *what to do with it*.
 
 ---
 
